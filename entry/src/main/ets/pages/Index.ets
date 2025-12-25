@@ -119,12 +119,10 @@ struct Index {
         }
         // [End radioUsagePosition]
       }
-      .width('100%')
       .padding(24)
       .backgroundColor($r('sys.color.background_primary'))
-      .borderRadius({ topLeft: 24, topRight: 24 })
-      .shadow({ radius: 30, color: '#15000000', offsetY: -5 }) // Floating sheet effect
-      .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.BOTTOM])
+      .borderRadius(24)
+      .margin({ left: 16, right: 16 })
     }
     .height('100%')
     .width('100%')
