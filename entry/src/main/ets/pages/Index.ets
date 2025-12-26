@@ -49,8 +49,6 @@ struct Index {
                 .colorFilter(this.getFilterByTag(this.imageFilterTags[index]))
               // [End imageUsagePosition]
             }
-            .width('100%')
-            .height('85%') // Reserve space for shadow/spacing
             // Animation: Scale down inactive images for a "Carousel" effect
             .scale({
               x: this.currentSwiperIndex === index ? 1.0 : 0.9,
@@ -68,7 +66,7 @@ struct Index {
         })
         // [End swiperUsagePosition]
         .width('100%')
-        .height(400) // Fixed height for the gallery area
+        .height('100%') // Fixed height for the gallery area
         .itemSpace(20) // Space between images
         .indicator(
           Indicator.dot()
@@ -80,7 +78,8 @@ struct Index {
       }
       .layoutWeight(1) // Occupy remaining space
       .justifyContent(FlexAlign.Center)
-      .padding({ left: 10, right: 10 })
+      .padding({ left: 16, right: 16, top: 8 })
+      .margin({ top: 45 })
 
       // Bottom Section: Control Panel (Radios)
       Column() {
@@ -121,8 +120,13 @@ struct Index {
       }
       .padding(24)
       .backgroundColor($r('sys.color.background_primary'))
-      .borderRadius(24)
-      .margin({ left: 16, right: 16 })
+      .borderRadius(16)
+      .margin({
+        left: 16,
+        right: 16,
+        top: 36,
+        bottom: 16
+      })
     }
     .height('100%')
     .width('100%')
