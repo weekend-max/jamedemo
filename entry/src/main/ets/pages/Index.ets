@@ -90,32 +90,34 @@ struct Index {
           .margin({ bottom: 16 })
           .fontColor($r('sys.color.font_primary'))
         // [Start radioUsagePosition]
-        // Use Flex Wrap for responsive layout of radio buttons
-        Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.SpaceBetween }) {
+        Grid() {
           ForEach(FILTER_OPTIONS, (item: FilterOption) => {
-            Row() {
-              Radio({ value: item.value, group: 'filterGroup' })
-                // The radio is checked if the CURRENT image's filter tag matches this item
-                .checked(this.imageFilterTags[this.currentSwiperIndex] === item.value)
-                .onChange((isChecked: boolean) => {
-                  if (isChecked) {
-                    // Update only the currently selected image's filter state
+            GridItem() {
+              Row() {
+                Radio({ value: item.value, group: 'filterGroup' })
+                  .checked(this.imageFilterTags[this.currentSwiperIndex] === item.value)
+                  .onChange((isChecked: boolean) => {
+                    if (isChecked) {
+                      this.imageFilterTags[this.currentSwiperIndex] = item.value;
+                    }
+                  })
+                Text(item.label)
+                  .fontSize(14)
+                  .fontColor($r('sys.color.font_primary'))
+                  .margin({ left: 4 })
+                  .onClick(() => {
                     this.imageFilterTags[this.currentSwiperIndex] = item.value;
-                  }
-                })
-              Text(item.label)
-                .fontSize(14)
-                .fontColor($r('sys.color.font_primary'))
-                .margin({ left: 4 })
-                .onClick(() => {
-                  // Allow clicking text to select radio
-                  this.imageFilterTags[this.currentSwiperIndex] = item.value;
-                })
+                  })
+              }
+              .width('100%')
             }
-            .width('30%') // Approximately 3 cols
-            .margin({ bottom: 16 })
           }, (item: FilterOption, index: number) => index + '_' + JSON.stringify(item))
         }
+        .columnsTemplate('1fr 1fr 1fr')
+        .rowsGap(16)
+        .columnsGap(10)
+        .width('100%')
+
         // [End radioUsagePosition]
       }
       .padding(24)
