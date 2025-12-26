@@ -13,7 +13,8 @@
  * limitations under the License.
  */
 
-import { CAROUSEL_DATA_SOURCE, FILTER_OPTIONS, FilterOption, ORIGINAL_MATRIX } from '../contants/CommonConstants';
+// 修改点1：修正 constants 路径拼写 (contants -> constants)
+import { CAROUSEL_DATA_SOURCE, FILTER_OPTIONS, FilterOption, ORIGINAL_MATRIX } from '../constants/CommonConstants';
 
 @Entry
 @Component
@@ -49,6 +50,7 @@ struct Index {
                 .colorFilter(this.getFilterByTag(this.imageFilterTags[index]))
               // [End imageUsagePosition]
             }
+            .justifyContent(FlexAlign.Center)
             // Animation: Scale down inactive images for a "Carousel" effect
             .scale({
               x: this.currentSwiperIndex === index ? 1.0 : 0.9,
@@ -76,7 +78,8 @@ struct Index {
         .loop(false) // Disable infinite loop for better control logic
         .effectMode(EdgeEffect.Spring) // Add bounce effect at edges
       }
-      .layoutWeight(1) // Occupy remaining space
+      .width('100%')
+      .height('65%')
       .justifyContent(FlexAlign.Center)
       .padding({ left: 16, right: 16, top: 8 })
       .margin({ top: 45 })
@@ -117,9 +120,9 @@ struct Index {
         .rowsGap(16)
         .columnsGap(10)
         .width('100%')
-
         // [End radioUsagePosition]
       }
+      .layoutWeight(1)
       .padding(24)
       .backgroundColor($r('sys.color.background_primary'))
       .borderRadius(16)

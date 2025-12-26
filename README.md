@@ -21,7 +21,7 @@
 
 ```
 ├──entry/src/main/ets/
-│  ├──contants
+│  ├──constants
 │  │  └──CommonConstants.ets              // 常量类
 │  ├──entryability
 │  │  └──EntryAbility.ets                 // 程序入口类
