@@ -13,7 +13,6 @@
  * limitations under the License.
  */
 
-// 修改点1：修正 constants 路径拼写 (contants -> constants)
 import { CAROUSEL_DATA_SOURCE, FILTER_OPTIONS, FilterOption, ORIGINAL_MATRIX } from '../constants/CommonConstants';
 
 @Entry
@@ -68,15 +67,15 @@ struct Index {
         })
         // [End swiperUsagePosition]
         .width('100%')
-        .height('100%') // Fixed height for the gallery area
-        .itemSpace(20) // Space between images
+        .height('100%')
+        .itemSpace(20)
         .indicator(
           Indicator.dot()
             .selectedColor($r('sys.color.font_primary'))
             .color($r('sys.color.font_secondary'))
         )
-        .loop(false) // Disable infinite loop for better control logic
-        .effectMode(EdgeEffect.Spring) // Add bounce effect at edges
+        .loop(false)
+        .effectMode(EdgeEffect.Spring)
       }
       .width('100%')
       .height('65%')
