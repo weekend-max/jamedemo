@@ -15,7 +15,7 @@
 
 ## 使用说明
 
-安装运行应用之后，分别点击图片下方的“复古”、“反色”、“增艳”和“美白”单选框，会显示对应的滤镜效果，滑动图片可以对不同的图片添加滤镜效果。
+安装运行应用之后，分别点击图片下方的“Retro”、“Invert”、“Enhance”和“Whiten”单选框，会显示对应的滤镜效果，滑动图片可以对不同的图片添加滤镜效果。
 
 ## 工程目录
 
@@ -36,8 +36,8 @@
 
 使用 `colorFilter`实现为图像设置颜色滤镜效果，有如下两种方式：
 
-- **矩阵滤镜**: 通过传入一个4x5的RGBA转换矩阵，给图像设置颜色滤镜效果，如 `RETRO_COLOR_MATRIX` 通过修改 RGB 权重实现怀旧色调。
-- **颜色滤波器滤镜**: 通过传入一个创建指定的颜色和混合模式的颜色滤波器，实现图形滤镜效果，例如`Whitening` 美白滤镜使用了 `drawing.ColorFilter.createBlendModeColorFilter`，通过 传入ARGB颜色值并设置`BlendMode.PLUS` 模式叠加白色层来实现提亮效果。
+- **4×5颜色矩阵**: 通过传入一个4x5的RGBA转换矩阵，给图像设置颜色滤镜效果，如 `RETRO_COLOR_MATRIX` 通过修改 RGB 权重实现怀旧色调。
+- **颜色滤波器**: 通过传入一个创建指定的颜色和混合模式的颜色滤波器，实现图形滤镜效果，例如`Whitening` 美白滤镜使用了 `drawing.ColorFilter.createBlendModeColorFilter`，通过 传入ARGB颜色值并设置`BlendMode.PLUS` 模式叠加白色层来实现提亮效果。
 
 
 ## 相关权限
