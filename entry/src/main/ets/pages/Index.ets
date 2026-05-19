@@ -14,6 +14,7 @@
  */
 
 import { CAROUSEL_DATA_SOURCE, FILTER_OPTIONS, FilterOption, ORIGINAL_MATRIX } from '../constants/CommonConstants';
+import { router } from '@kit.ArkUI';
 
 @Entry
 @Component
@@ -120,6 +121,19 @@ struct Index {
         .columnsGap(10)
         .width('100%')
         // [End radioUsagePosition]
+        
+        // 高级滤镜调节入口
+        Button('高级滤镜调节')
+          .width('100%')
+          .height(44)
+          .margin({ top: 16 })
+          .backgroundColor($r('sys.color.background_emphasize'))
+          .fontColor($r('sys.color.font_on_primary'))
+          .onClick(() => {
+            router.pushUrl({
+              url: 'pages/FilterAdjustPage'
+            });
+          })
       }
       .layoutWeight(1)
       .padding(24)
