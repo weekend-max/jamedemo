@@ -56,6 +56,9 @@ struct FilterAdjustPage {
   // 滤镜处理实例
   private filterProcessor: ImageFilterProcessor = ImageFilterProcessor.getInstance();
   
+  // 防抖定时器ID
+  private debounceTimer: number = -1;
+  
   aboutToAppear(): void {
     // 初始化时加载第一张图片
     this.loadImage(0);
@@ -122,10 +125,25 @@ struct FilterAdjustPage {
   }
   
   /**
+   * 应用滤镜效果（带防抖）
+   */
+  private applyFilterDebounced(): void {
+    // 清除之前的定时器
+    if (this.debounceTimer !== -1) {
+      clearTimeout(this.debounceTimer);
+    }
+    // 延迟 100ms 执行，避免频繁调用
+    this.debounceTimer = setTimeout(() => {
+      this.applyFilter();
+      this.debounceTimer = -1;
+    }, 100);
+  }
+  
+  /**
    * 应用滤镜效果
    */
   private async applyFilter(): Promise<void> {
-    if (!this.originalPixelMap) {
+    if (!this.originalPixelMap || this.isProcessing) {
       return;
     }
     
@@ -266,7 +284,7 @@ struct FilterAdjustPage {
             (value: number) => {
               this.filterBrightness = value;
               this.selectedPreset = '';
-              this.applyFilter();
+              this.applyFilterDebounced();
             }
           )
           
@@ -279,7 +297,7 @@ struct FilterAdjustPage {
             (value: number) => {
               this.filterContrast = value;
               this.selectedPreset = '';
-              this.applyFilter();
+              this.applyFilterDebounced();
             }
           )
           
@@ -292,7 +310,7 @@ struct FilterAdjustPage {
             (value: number) => {
               this.filterSaturation = value;
               this.selectedPreset = '';
-              this.applyFilter();
+              this.applyFilterDebounced();
             }
           )
           
@@ -305,7 +323,7 @@ struct FilterAdjustPage {
             (value: number) => {
               this.filterSharpness = value;
               this.selectedPreset = '';
-              this.applyFilter();
+              this.applyFilterDebounced();
             }
           )
           
@@ -318,7 +336,7 @@ struct FilterAdjustPage {
             (value: number) => {
               this.filterExposure = value;
               this.selectedPreset = '';
-              this.applyFilter();
+              this.applyFilterDebounced();
             }
           )
         }

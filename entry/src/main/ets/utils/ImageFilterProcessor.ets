@@ -14,7 +14,7 @@
  */
 
 import { image } from '@kit.ImageKit';
-import { effectKit } from '@kit.ArkGraphics2D';
+import { taskpool } from '@kit.ArkTS';
 
 /**
  * 滤镜参数接口
@@ -39,8 +39,109 @@ export const DEFAULT_FILTER_PARAMS: FilterParams = {
 };
 
 /**
+ * 像素处理任务函数（在工作线程执行）
+ * 所有处理逻辑内联，符合 @Concurrent 函数要求
+ */
+@Concurrent
+function processPixels(
+  buffer: ArrayBuffer,
+  width: number,
+  height: number,
+  brightness: number,
+  contrast: number,
+  saturation: number,
+  sharpness: number,
+  exposure: number
+): ArrayBuffer {
+  const pixels = new Uint8Array(buffer);
+  const len = pixels.length;
+  
+  // 1. 应用亮度调整
+  if (Math.abs(brightness) >= 0.001) {
+    const factor = brightness / 100.0;
+    for (let i = 0; i < len; i += 4) {
+      for (let c = 0; c < 3; c++) {
+        let value = pixels[i + c];
+        if (factor > 0) {
+          value = value + Math.floor((255 - value) * factor);
+        } else {
+          value = value + Math.floor(value * factor);
+        }
+        pixels[i + c] = Math.max(0, Math.min(255, value));
+      }
+    }
+  }
+  
+  // 2. 应用对比度调整
+  if (Math.abs(contrast - 1.0) >= 0.001) {
+    for (let i = 0; i < len; i += 4) {
+      for (let c = 0; c < 3; c++) {
+        let value = pixels[i + c];
+        value = Math.floor((value - 128) * contrast + 128);
+        pixels[i + c] = Math.max(0, Math.min(255, value));
+      }
+    }
+  }
+  
+  // 3. 应用饱和度调整
+  if (Math.abs(saturation - 1.0) >= 0.001) {
+    for (let i = 0; i < len; i += 4) {
+      const r = pixels[i];
+      const g = pixels[i + 1];
+      const b = pixels[i + 2];
+      const gray = Math.floor(0.299 * r + 0.587 * g + 0.114 * b);
+      
+      pixels[i] = Math.max(0, Math.min(255, Math.floor(gray + saturation * (r - gray))));
+      pixels[i + 1] = Math.max(0, Math.min(255, Math.floor(gray + saturation * (g - gray))));
+      pixels[i + 2] = Math.max(0, Math.min(255, Math.floor(gray + saturation * (b - gray))));
+    }
+  }
+  
+  // 4. 应用曝光调整
+  if (Math.abs(exposure) >= 0.001) {
+    const expFactor = Math.pow(2.0, exposure);
+    for (let i = 0; i < len; i += 4) {
+      for (let c = 0; c < 3; c++) {
+        const value = pixels[i + c] * expFactor;
+        pixels[i + c] = Math.max(0, Math.min(255, Math.floor(value)));
+      }
+    }
+  }
+  
+  // 5. 应用锐化效果（最后处理，需要临时数组）
+  if (sharpness > 0.001) {
+    const rowSize = width * 4;
+    const tempPixels = new Uint8Array(pixels);
+    
+    for (let y = 1; y < height - 1; y++) {
+      for (let x = 1; x < width - 1; x++) {
+        const idx = y * rowSize + x * 4;
+        const topIdx = (y - 1) * rowSize + x * 4;
+        const bottomIdx = (y + 1) * rowSize + x * 4;
+        const leftIdx = y * rowSize + (x - 1) * 4;
+        const rightIdx = y * rowSize + (x + 1) * 4;
+        
+        for (let c = 0; c < 3; c++) {
+          const center = tempPixels[idx + c];
+          const top = tempPixels[topIdx + c];
+          const bottom = tempPixels[bottomIdx + c];
+          const left = tempPixels[leftIdx + c];
+          const right = tempPixels[rightIdx + c];
+          
+          const laplacian = 5 * center - top - bottom - left - right;
+          const sharpened = center + Math.floor(sharpness * (laplacian - center));
+          pixels[idx + c] = Math.max(0, Math.min(255, sharpened));
+        }
+      }
+    }
+  }
+  
+  return buffer;
+}
+
+/**
  * 图像滤镜处理工具类
- * 使用 EffectKit 和 PixelMap 操作实现图像处理
+ * 使用 TaskPool 在工作线程处理图像，避免阻塞 UI
  */
 export class ImageFilterProcessor {
   private static instance: ImageFilterProcessor | null = null;
@@ -71,19 +172,23 @@ export class ImageFilterProcessor {
       const height = imageInfo.size.height;
       
       // 读取像素数据
-      const bufferSize = width * height * 4; // RGBA_8888
+      const bufferSize = width * height * 4;
       const buffer = new ArrayBuffer(bufferSize);
       await pixelMap.readPixelsToBuffer(buffer);
       
-      // 转换为 Uint8Array 进行处理
-      const pixels = new Uint8Array(buffer);
-      
-      // 应用各种滤镜效果
-      this.applyBrightness(pixels, width, height, params.brightness);
-      this.applyContrast(pixels, width, height, params.contrast);
-      this.applySaturation(pixels, width, height, params.saturation);
-      this.applySharpen(pixels, width, height, params.sharpness);
-      this.applyExposure(pixels, width, height, params.exposure);
+      // 使用 TaskPool 在工作线程处理像素
+      const task = new taskpool.Task(
+        processPixels,
+        buffer,
+        width,
+        height,
+        params.brightness,
+        params.contrast,
+        params.saturation,
+        params.sharpness,
+        params.exposure
+      );
+      const processedBuffer = await taskpool.execute(task) as ArrayBuffer;
       
       // 创建新的 PixelMap
       const opts: image.InitializationOptions = {
@@ -92,124 +197,11 @@ export class ImageFilterProcessor {
         size: { width, height }
       };
       
-      const resultPixelMap = await image.createPixelMap(buffer, opts);
+      const resultPixelMap = await image.createPixelMap(processedBuffer, opts);
       return resultPixelMap;
     } catch (error) {
       console.error('ImageFilterProcessor: Failed to apply filter', error);
       return null;
-    }
-  }
-
-  /**
-   * 应用亮度调整
-   * brightness: -100 ~ 100
-   */
-  private applyBrightness(pixels: Uint8Array, width: number, height: number, brightness: number): void {
-    if (Math.abs(brightness) < 0.001) return;
-    
-    // 转换为 -1.0 ~ 1.0 的范围
-    const factor = brightness / 100.0;
-    
-    for (let i = 0; i < pixels.length; i += 4) {
-      for (let c = 0; c < 3; c++) {
-        let value = pixels[i + c];
-        if (factor > 0) {
-          value = value + Math.floor((255 - value) * factor);
-        } else {
-          value = value + Math.floor(value * factor);
-        }
-        pixels[i + c] = Math.max(0, Math.min(255, value));
-      }
-    }
-  }
-
-  /**
-   * 应用对比度调整
-   * contrast: 0 ~ 3 (1.0 为原始)
-   */
-  private applyContrast(pixels: Uint8Array, width: number, height: number, contrast: number): void {
-    if (Math.abs(contrast - 1.0) < 0.001) return;
-    
-    for (let i = 0; i < pixels.length; i += 4) {
-      for (let c = 0; c < 3; c++) {
-        let value = pixels[i + c];
-        value = Math.floor((value - 128) * contrast + 128);
-        pixels[i + c] = Math.max(0, Math.min(255, value));
-      }
-    }
-  }
-
-  /**
-   * 应用饱和度调整
-   * saturation: 0 ~ 3 (1.0 为原始)
-   */
-  private applySaturation(pixels: Uint8Array, width: number, height: number, saturation: number): void {
-    if (Math.abs(saturation - 1.0) < 0.001) return;
-    
-    for (let i = 0; i < pixels.length; i += 4) {
-      const r = pixels[i];
-      const g = pixels[i + 1];
-      const b = pixels[i + 2];
-      
-      // 计算灰度值 (ITU-R BT.709 标准)
-      const gray = Math.floor(0.299 * r + 0.587 * g + 0.114 * b);
-      
-      // 应用饱和度调整: 新颜色 = 灰度 + 饱和度 * (原颜色 - 灰度)
-      pixels[i] = Math.max(0, Math.min(255, Math.floor(gray + saturation * (r - gray))));
-      pixels[i + 1] = Math.max(0, Math.min(255, Math.floor(gray + saturation * (g - gray))));
-      pixels[i + 2] = Math.max(0, Math.min(255, Math.floor(gray + saturation * (b - gray))));
-    }
-  }
-
-  /**
-   * 应用锐化效果 (拉普拉斯锐化)
-   * sharpness: 0 ~ 2
-   */
-  private applySharpen(pixels: Uint8Array, width: number, height: number, sharpness: number): void {
-    if (sharpness <= 0.001) return;
-    
-    const rowSize = width * 4;
-    const tempPixels = new Uint8Array(pixels);
-    
-    for (let y = 1; y < height - 1; y++) {
-      for (let x = 1; x < width - 1; x++) {
-        const idx = y * rowSize + x * 4;
-        const topIdx = (y - 1) * rowSize + x * 4;
-        const bottomIdx = (y + 1) * rowSize + x * 4;
-        const leftIdx = y * rowSize + (x - 1) * 4;
-        const rightIdx = y * rowSize + (x + 1) * 4;
-        
-        for (let c = 0; c < 3; c++) {
-          const center = tempPixels[idx + c];
-          const top = tempPixels[topIdx + c];
-          const bottom = tempPixels[bottomIdx + c];
-          const left = tempPixels[leftIdx + c];
-          const right = tempPixels[rightIdx + c];
-          
-          // 拉普拉斯算子: 5*center - top - bottom - left - right
-          const laplacian = 5 * center - top - bottom - left - right;
-          const sharpened = center + Math.floor(sharpness * (laplacian - center));
-          pixels[idx + c] = Math.max(0, Math.min(255, sharpened));
-        }
-      }
-    }
-  }
-
-  /**
-   * 应用曝光调整
-   * exposure: -3 ~ 3 (0 为原始)
-   */
-  private applyExposure(pixels: Uint8Array, width: number, height: number, exposure: number): void {
-    if (Math.abs(exposure) < 0.001) return;
-    
-    // 曝光调整因子: 2^exposure
-    const factor = Math.pow(2.0, exposure);
-    
-    for (let i = 0; i < pixels.length; i += 4) {
-      for (let c = 0; c < 3; c++) {
-        const value = pixels[i + c] * factor;
-        pixels[i + c] = Math.max(0, Math.min(255, Math.floor(value)));
-      }
     }
   }
 }
