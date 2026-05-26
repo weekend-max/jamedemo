@@ -132,11 +132,11 @@ struct FilterAdjustPage {
     if (this.debounceTimer !== -1) {
       clearTimeout(this.debounceTimer);
     }
-    // 延迟 100ms 执行，避免频繁调用
+    // 延迟 30ms 执行，提高响应速度
     this.debounceTimer = setTimeout(() => {
       this.applyFilter();
       this.debounceTimer = -1;
-    }, 100);
+    }, 30);
   }
   
   /**

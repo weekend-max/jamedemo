@@ -40,7 +40,7 @@ export const DEFAULT_FILTER_PARAMS: FilterParams = {
 
 /**
  * 像素处理任务函数（在工作线程执行）
- * 所有处理逻辑内联，符合 @Concurrent 函数要求
+ * 优化版本：合并多个滤镜效果为一次遍历，提升性能
  */
 @Concurrent
 function processPixels(
@@ -56,59 +56,64 @@ function processPixels(
   const pixels = new Uint8Array(buffer);
   const len = pixels.length;
   
-  // 1. 应用亮度调整
-  if (Math.abs(brightness) >= 0.001) {
-    const factor = brightness / 100.0;
-    for (let i = 0; i < len; i += 4) {
-      for (let c = 0; c < 3; c++) {
-        let value = pixels[i + c];
-        if (factor > 0) {
-          value = value + Math.floor((255 - value) * factor);
-        } else {
-          value = value + Math.floor(value * factor);
-        }
-        pixels[i + c] = Math.max(0, Math.min(255, value));
-      }
-    }
-  }
+  // 预计算常量，避免循环内重复计算
+  const hasBrightness = Math.abs(brightness) >= 0.001;
+  const hasContrast = Math.abs(contrast - 1.0) >= 0.001;
+  const hasSaturation = Math.abs(saturation - 1.0) >= 0.001;
+  const hasExposure = Math.abs(exposure) >= 0.001;
+  const brightnessFactor = brightness / 100.0;
+  const expFactor = Math.pow(2.0, exposure);
   
-  // 2. 应用对比度调整
-  if (Math.abs(contrast - 1.0) >= 0.001) {
+  // 合并亮度、对比度、饱和度、曝光为一次遍历
+  if (hasBrightness || hasContrast || hasSaturation || hasExposure) {
     for (let i = 0; i < len; i += 4) {
-      for (let c = 0; c < 3; c++) {
-        let value = pixels[i + c];
-        value = Math.floor((value - 128) * contrast + 128);
-        pixels[i + c] = Math.max(0, Math.min(255, value));
-      }
-    }
-  }
-  
-  // 3. 应用饱和度调整
-  if (Math.abs(saturation - 1.0) >= 0.001) {
-    for (let i = 0; i < len; i += 4) {
-      const r = pixels[i];
-      const g = pixels[i + 1];
-      const b = pixels[i + 2];
-      const gray = Math.floor(0.299 * r + 0.587 * g + 0.114 * b);
+      let r = pixels[i];
+      let g = pixels[i + 1];
+      let b = pixels[i + 2];
       
-      pixels[i] = Math.max(0, Math.min(255, Math.floor(gray + saturation * (r - gray))));
-      pixels[i + 1] = Math.max(0, Math.min(255, Math.floor(gray + saturation * (g - gray))));
-      pixels[i + 2] = Math.max(0, Math.min(255, Math.floor(gray + saturation * (b - gray))));
-    }
-  }
-  
-  // 4. 应用曝光调整
-  if (Math.abs(exposure) >= 0.001) {
-    const expFactor = Math.pow(2.0, exposure);
-    for (let i = 0; i < len; i += 4) {
-      for (let c = 0; c < 3; c++) {
-        const value = pixels[i + c] * expFactor;
-        pixels[i + c] = Math.max(0, Math.min(255, Math.floor(value)));
+      // 1. 应用曝光
+      if (hasExposure) {
+        r = r * expFactor;
+        g = g * expFactor;
+        b = b * expFactor;
       }
+      
+      // 2. 应用亮度
+      if (hasBrightness) {
+        if (brightnessFactor > 0) {
+          r = r + (255 - r) * brightnessFactor;
+          g = g + (255 - g) * brightnessFactor;
+          b = b + (255 - b) * brightnessFactor;
+        } else {
+          r = r + r * brightnessFactor;
+          g = g + g * brightnessFactor;
+          b = b + b * brightnessFactor;
+        }
+      }
+      
+      // 3. 应用对比度
+      if (hasContrast) {
+        r = (r - 128) * contrast + 128;
+        g = (g - 128) * contrast + 128;
+        b = (b - 128) * contrast + 128;
+      }
+      
+      // 4. 应用饱和度
+      if (hasSaturation) {
+        const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+        r = gray + saturation * (r - gray);
+        g = gray + saturation * (g - gray);
+        b = gray + saturation * (b - gray);
+      }
+      
+      // 限制范围并写入
+      pixels[i] = Math.max(0, Math.min(255, Math.floor(r)));
+      pixels[i + 1] = Math.max(0, Math.min(255, Math.floor(g)));
+      pixels[i + 2] = Math.max(0, Math.min(255, Math.floor(b)));
     }
   }
   
-  // 5. 应用锐化效果（最后处理，需要临时数组）
+  // 5. 应用锐化效果（需要单独处理，因为涉及相邻像素）
   if (sharpness > 0.001) {
     const rowSize = width * 4;
     const tempPixels = new Uint8Array(pixels);
@@ -116,19 +121,18 @@ function processPixels(
     for (let y = 1; y < height - 1; y++) {
       for (let x = 1; x < width - 1; x++) {
         const idx = y * rowSize + x * 4;
-        const topIdx = (y - 1) * rowSize + x * 4;
-        const bottomIdx = (y + 1) * rowSize + x * 4;
-        const leftIdx = y * rowSize + (x - 1) * 4;
-        const rightIdx = y * rowSize + (x + 1) * 4;
+        const topIdx = idx - rowSize;
+        const bottomIdx = idx + rowSize;
+        const leftIdx = idx - 4;
+        const rightIdx = idx + 4;
         
         for (let c = 0; c < 3; c++) {
           const center = tempPixels[idx + c];
-          const top = tempPixels[topIdx + c];
-          const bottom = tempPixels[bottomIdx + c];
-          const left = tempPixels[leftIdx + c];
-          const right = tempPixels[rightIdx + c];
-          
-          const laplacian = 5 * center - top - bottom - left - right;
+          const laplacian = 5 * center - 
+            tempPixels[topIdx + c] - 
+            tempPixels[bottomIdx + c] - 
+            tempPixels[leftIdx + c] - 
+            tempPixels[rightIdx + c];
           const sharpened = center + Math.floor(sharpness * (laplacian - center));
           pixels[idx + c] = Math.max(0, Math.min(255, sharpened));
         }
