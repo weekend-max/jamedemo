@@ -1,0 +1,16 @@
+# IDE
+.idea/
+
+# Build
+.hvigor/
+entry/.cxx/
+entry/.preview/
+entry/build/
+hvigorw
+
+# Archive
+*.zip
+
+# OS
+.DS_Store
+Thumbs.db
