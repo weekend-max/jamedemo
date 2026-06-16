@@ -11,6 +11,10 @@
     {
       "name": "EntryAbility_label",
       "value": "imagefilter"
+    },
+    {
+      "name": "distributed_datasync_desc",
+      "value": "允许应用在不同设备间同步数据，实现自由流转功能"
     }
   ]
 }
